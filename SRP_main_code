@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sol's RNG</title>
+
+    <link
+      rel="icon"
+      type="image/png"
+      href="https://files.catbox.moe/ttfu7s.webp"
+    />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+             body {
+                 font-family: 'Inter', sans-serif;
+                 background-color: #87CEEB ;
+                 color: white;
+                 overflow: hidden;
+                 height: 100vh;
+                 margin: 0;
+                 user-select: none;
+             }
+
+             .aura-text {
+                 text-shadow: 0 0 20px currentColor;
+                 transition: all 0.3s ease;
+             }
+
+             .roll-btn {
+                 background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                 box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+             }
+
+             .roll-btn:disabled {
+                 background: #333;
+                 box-shadow: none;
+                 cursor: not-allowed;
+                 opacity: 0.5;
+             }
+
+             .vignette {
+                 position: fixed;
+                 top: 0; left: 0; width: 100%; height: 100%;
+                 background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.8) 100%);
+                 pointer-events: none;
+             }
+
+             @keyframes float {
+                 0% { transform: translateY(0px); }
+                 50% { transform: translateY(-15px); }
+                 100% { transform: translateY(0px); }
+             }
+
+             .floating {
+                 animation: float 3s ease-in-out infinite;
+             }
+
+             #background-aura {
+                 position: fixed;
+                 top: 0; left: 0; width: 100%; height: 100%;
+                 z-index: -1;
+                 opacity: 0.2;
+                 transition: background 1s ease;
+             }
+
+             .shake {
+                 animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+             }
+
+             @keyframes shake {
+                 10%, 90% { transform: translate3d(-2px, 0, 0); }
+                 20%, 80% { transform: translate3d(4px, 0, 0); }
+                 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+                 40%, 60% { transform: translate3d(6px, 0, 0); }
+             }
+
+             .particle {
+                 position: absolute;
+                 pointer-events: none;
+                 border-radius: 50%;
+                 z-index: 5;
+             }
+
+             @keyframes particle-fade {
+                 to {
+                     transform: translate(var(--tw-x), var(--tw-y)) scale(0);
+                     opacity: 0;
+                 }
+             }
+
+             .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+             .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+
+             .cooldown-overlay {
+                 position: absolute;
+                 bottom: 0;
+                 left: 0;
+                 width: 100%;
+                 background: rgba(255,255,255,0.1);
+                 transition: height 0.1s linear;
+                 pointer-events: none;
+             }
+
+             .btn-equipped {
+                 border: 2px solid #3b82f6;
+                 background: rgba(59, 130, 246, 0.2) !important;
+             }
+
+      #pixel-background {
+         position: fixed;
+         inset: 0;
+         overflow: hidden;
+         z-index: -20;
+         background: #87CEEB;
+      }
+
+      #pixel-background::before {
+         content: "";
+         position: absolute;
+         inset: 0;
+         background-image:
+             radial-gradient(#00ffff88 1px, transparent 1px);
+         background-size: 18px 18px;
+         opacity: 0.25;
+      }
+
+      .ground {
+         position: absolute;
+         bottom: 0;
+         width: 100%;
+         height: 140px;
+         background: #008000;
+         border-top: 8px solid #006400;
+      }
+
+      .tree {
+         position: absolute;
+         bottom: 120px;
+         width: 140px;
+         height: 260px;
+      }
+
+      .trunk {
+         position: absolute;
+         bottom: 0;
+         left: 50%;
+         transform: translateX(-50%);
+         width: 36px;
+         height: 120px;
+         background: #8B4513;
+      }
+
+      .leaves {
+         position: absolute;
+         top: 0;
+         left: 50%;
+         transform: translateX(-50%);
+         width: 140px;
+         height: 140px;
+         background: #228B22;
+         clip-path: polygon(
+             20% 0%,
+             80% 0%,
+             80% 20%,
+             100% 20%,
+             100% 80%,
+             80% 80%,
+             80% 100%,
+             20% 100%,
+             20% 80%,
+             0% 80%,
+             0% 20%,
+             20% 20%
+         );
+         box-shadow: 0 0 25px #008000;
+      }
+
+      .tree-left { left: 40px; }
+      .tree-right { right: 40px; }
+    </style>
+  </head>
+  <body>
+    <video
+      id="cutscene-video"
+      class="fixed inset-0 w-full h-full object-cover z-[1000]"
+      style="display:none;"
+    ></video>
+    <audio id="cutscene-audio"></audio>
+    <audio id="bg-music" loop>
+      <source src="https://files.catbox.moe/k0nmaw.mp3" type="audio/mpeg" />
+    </audio>
+
+    <div id="pixel-background">
+      <div class="ground"></div>
+
+      <div class="tree tree-left">
+        <div class="leaves"></div>
+        <div class="trunk"></div>
+      </div>
+
+      <div class="tree tree-right">
+        <div class="leaves"></div>
+        <div class="trunk"></div>
+      </div>
+    </div>
+    <div id="background-aura"></div>
+    <div
+      id="particle-container"
+      class="fixed inset-0 pointer-events-none"
+    ></div>
+    <div class="vignette"></div>
+
+    <div class="relative z-10 flex flex-col h-full p-6">
+      <!-- Header Stats -->
+      <div class="flex justify-between items-start">
+        <div>
+          <h1 class="text-3xl font-black tracking-tighter italic">
+            SOL'S RNG<span
+              class="text-blue-500 text-sm not-italic font-bold"
+            ></span>
+          </h1>
+          <p class="text-gray-400 text-sm font-bold uppercase tracking-wider">
+            Total Rolls: <span id="roll-count" class="text-white">0</span>
+          </p>
+          <!-- BIOME DISPLAY -->
+          <p
+            id="biome-display"
+            class="text-sm font-black uppercase tracking-wider mt-1 text-gray-400 transition-colors"
+          >
+            [ Normal ]
+          </p>
+          <div
+            id="active-devices"
+            class="flex flex-wrap gap-2 mt-2 max-w-md"
+          ></div>
+        </div>
+        <div class="flex flex-col items-end gap-3">
+          <div
+            id="luck-multiplier"
+            class="text-green-400 font-bold bg-green-400/10 px-4 py-1.5 rounded-full border border-green-400/20"
+          >
+            2.5x Luck
+          </div>
+          <div class="flex gap-2 text-white">
+            <button
+              onclick="openModal('crafting-modal')"
+              class="bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition"
+            >
+              GEARS
+            </button>
+            <button
+              onclick="openModal('potions-modal')"
+              class="bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition"
+            >
+              POTIONS
+            </button>
+            <button
+              onclick="openModal('inventory-modal')"
+              class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition"
+            >
+              AURAS
+            </button>
+            <button
+              onclick="openModal('settings-modal')"
+              class="bg-zinc-700/20 hover:bg-zinc-700/40 border border-zinc-500/30 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition"
+            >
+              SETTINGS
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Display -->
+      <div
+        id="main-display"
+        class="flex-grow flex flex-col items-center justify-center text-center"
+      >
+        <div id="aura-container" class="mb-12 relative">
+          <div
+            id="rarity-label"
+            class="text-xs uppercase tracking-[0.4em] font-black text-gray-600 mb-2"
+          >
+            READY TO ROLL?
+          </div>
+          <div
+            id="aura-name"
+            class="text-5xl md:text-8xl font-black aura-text floating tracking-tighter break-words max-w-4xl px-4 uppercase"
+          >
+            CLICK ROLL
+          </div>
+          <div
+            id="aura-chance"
+            class="text-gray-400 mt-6 font-bold tracking-[0.2em] h-6 uppercase text-sm"
+          ></div>
+        </div>
+
+        <div class="space-y-6">
+          <div
+            id="roll-streak"
+            class="text-lg font-black mb-3 text-yellow-300 tracking-widest"
+          >
+            1/10
+          </div>
+
+          <div class="relative inline-block">
+            <button
+              id="roll-btn"
+              onclick="roll()"
+              class="roll-btn px-20 py-7 rounded-full text-3xl font-black tracking-widest transform transition-all active:scale-95 text-white"
+            >
+              ROLL
+            </button>
+            <div
+              id="potion-indicator"
+              class="hidden absolute -top-12 left-1/2 -translate-x-1/2 text-sm font-black text-yellow-400 animate-pulse whitespace-nowrap bg-yellow-400/10 px-4 py-1 rounded-full border border-yellow-400/20"
+            >
+              POTION ACTIVE
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center gap-2">
+            <label class="flex items-center cursor-pointer group">
+              <input
+                type="checkbox"
+                id="auto-roll"
+                class="hidden"
+                onchange="toggleAutoRoll()"
+              />
+              <div
+                class="w-14 h-7 bg-gray-800 rounded-full relative transition-colors group-hover:bg-gray-700"
+                id="auto-toggle-bg"
+              >
+                <div
+                  class="w-5 h-5 bg-white rounded-full absolute left-1 top-1 transition-all"
+                  id="auto-toggle-dot"
+                ></div>
+              </div>
+              <span
+                class="ml-3 text-sm font-black tracking-widest text-gray-400 group-hover:text-white transition-colors uppercase"
+                >Auto Roll</span
+              >
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modals -->
+      <div
+        id="inventory-modal"
+        class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md"
+      >
+        <div
+          class="bg-[#0f0f0f] w-full max-w-4xl rounded-2xl border border-white/10 max-h-[85vh] flex flex-col shadow-2xl"
+        >
+          <div
+            class="p-6 border-b border-white/10 flex justify-between items-center"
+          >
+            <h2 class="text-2xl font-black italic tracking-tighter">
+              COLLECTION
+            </h2>
+            <button
+              onclick="closeModal('inventory-modal')"
+              class="text-gray-500 hover:text-white text-3xl"
+            >
+              &times;
+            </button>
+          </div>
+          <div
+            id="inventory-list"
+            class="flex-grow overflow-y-auto p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 custom-scrollbar"
+          ></div>
+        </div>
+      </div>
+
+      <div
+        id="crafting-modal"
+        class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md"
+      >
+        <div
+          class="bg-[#0f0f0f] w-full max-w-3xl rounded-2xl border border-blue-500/20 max-h-[85vh] flex flex-col shadow-2xl"
+        >
+          <div
+            class="p-6 border-b border-white/10 flex justify-between items-center"
+          >
+            <h2 class="text-2xl font-black italic tracking-tighter">
+              GEAR STATION
+            </h2>
+            <button
+              onclick="closeModal('crafting-modal')"
+              class="text-gray-500 hover:text-white text-3xl"
+            >
+              &times;
+            </button>
+          </div>
+          <div
+            id="crafting-list"
+            class="flex-grow overflow-y-auto p-6 flex flex-col gap-6 custom-scrollbar"
+          ></div>
+        </div>
+      </div>
+
+      <div
+        id="potions-modal"
+        class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md"
+      >
+        <div
+          class="bg-[#0f0f0f] w-full max-w-3xl rounded-2xl border border-purple-500/20 max-h-[85vh] flex flex-col shadow-2xl"
+        >
+          <div
+            class="p-6 border-b border-white/10 flex justify-between items-center"
+          >
+            <h2 class="text-2xl font-black italic tracking-tighter">POTIONS</h2>
+            <button
+              onclick="closeModal('potions-modal')"
+              class="text-gray-500 hover:text-white text-3xl"
+            >
+              &times;
+            </button>
+          </div>
+          <div
+            class="p-6 bg-purple-500/5 text-purple-300 text-xs font-bold uppercase tracking-widest text-center border-b border-purple-500/10"
+          >
+            Potions only apply for your VERY NEXT roll!
+          </div>
+          <div
+            id="potions-list"
+            class="flex-grow overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-4 custom-scrollbar"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="settings-modal"
+      class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md"
+    >
+      <div
+        class="bg-black w-full max-w-md rounded-xl border border-gray-500 overflow-hidden shadow-2xl"
+      >
+        <div
+          class="border-b border-gray-500 px-5 py-3 flex justify-between items-center"
+        >
+          <h2 class="text-2xl font-bold lowercase">setting</h2>
+          <button
+            onclick="closeModal('settings-modal')"
+            class="text-2xl text-gray-400 hover:text-white"
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="p-6 space-y-6">
+          <div class="flex items-center justify-between gap-5">
+            <span class="text-lg"> Play Cutscene </span>
+            <input
+              type="number"
+              id="cutscene-threshold"
+              min="1"
+              value="1"
+              class="w-40 bg-black border-[5px] border-gray-500 text-white text-center text-2xl font-bold px-2 py-1"
+              onchange="updateCutsceneThreshold(this.value)"
+            />
+          </div>
+
+          <div class="flex items-center justify-between gap-5">
+            <span class="text-lg">Backsound</span>
+            <input
+              type="range"
+              id="bg-volume"
+              min="0"
+              max="100"
+              value="25"
+              class="w-40 accent-purple-500"
+              oninput="updateBGVolume(this.value)"
+            />
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="text-lg">Cutscene</span>
+            <button
+              id="cutscene-toggle"
+              onclick="toggleCutscene()"
+              class="bg-green-500 px-6 py-1 font-black text-black min-w-[80px]"
+            >
+              on
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="notif-container"
+      class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
+    ></div>
+
+    <script>
+              // System Biome Data
+              const biomes = [
+                { name: "Starfall", chance: 7500, duration: 650, color: "#002dc2ff" },
+                { name: "Null", chance: 10100, duration: 99, color: "#565656ff" },
+                { name: "Corruption", chance: 9000, duration: 650, color: "#7c13deff" },
+                { name: "Hell", chance: 6666, duration: 666, color: "#ef4444" },
+                { name: "Heaven", chance: 3000, duration: 240, color: "#fcea24ff" },
+                { name: "Sandstorm", chance: 3000, duration: 650, color: "#eab308" },
+                { name: "Rainy", chance: 750, duration: 120, color: "#3b82f6" },
+                { name: "Snowy", chance: 600, duration: 120, color: "#e0f2fe" },
+                { name: "Windy", chance: 500, duration: 120, color: "#a7f3d0" },
+                { name: "Glitched", chance: 5100000, duration: 164, color: "#cfcfcfff" },
+                { name: "Dreamspace", chance: 3500000, duration: 192, color: "#ff00e1ff" },
+                { name: "Singularity", chance: 750000, duration: 1200, color: "#ff7300ff" },
+              ];
+
+              let currentBiome = {
+                name: "Normal",
+                color: "#9ca3af",
+                expiresAt: 0
+              };
+
+              function updateBiomeSystem() {
+                const biomeEl = document.getElementById('biome-display');
+                if (!biomeEl) return;
+
+                const now = Date.now();
+
+                if (currentBiome.name === "Normal") {
+                  biomeEl.innerText = "[ Normal ]";
+                  biomeEl.style.color = currentBiome.color;
+
+                  const sortedBiomes = [...biomes].sort((a, b) => b.chance - a.chance);
+                  for (const b of sortedBiomes) {
+                    if (Math.random() < (1 / b.chance)) {
+                      currentBiome = {
+                        name: b.name,
+                        color: b.color,
+                        expiresAt: now + (b.duration * 1000)
+                      };
+
+            const specialBiomeMessages = {
+                "Glitched": "Unexpected error occurred. [Code 404]",
+                "Dreamspace": "You begin to feel sleepy...",
+                "Singularity": "The Singularity pulls in everything, including you..."
+            };
+
+            const message = specialBiomeMessages[b.name]
+                || `BIOME CHANGED TO: [ ${b.name.toUpperCase()} ]`;
+
+            showNotification(message, b.color);
+
+                      break;
+                    }
+                  }
+                } else {
+                  const remaining = Math.ceil((currentBiome.expiresAt - now) / 1000);
+
+                  if (remaining <= 0) {
+                    showNotification("BIOME RETURNED TO NORMAL", "#9ca3af");
+                    currentBiome = {
+                      name: "Normal",
+                      color: "#9ca3af",
+                      expiresAt: 0
+                    };
+                    biomeEl.innerText = "[ Normal ]";
+                    biomeEl.style.color = currentBiome.color;
+                  } else {
+                    // Hanya menampilkan nama biome tanpa tulisan detik
+                    biomeEl.innerText = `[ ${currentBiome.name} ]`;
+                    biomeEl.style.color = currentBiome.color;
+                  }
+                }
+              }
+
+              function formatDate(timestamp) {
+                  const d = new Date(timestamp);
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  const year = d.getFullYear();
+                  const hours = String(d.getHours()).padStart(2, '0');
+                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                  return `${day}/${month}/${year} ${hours}:${minutes}`;
+              }
+
+              // Aura Data
+              const auras = [
+               { name: "Common", chance: 2, color: "#ffffff", label: "BASIC" },
+               { name: "Uncommon", chance: 4, color: "#90ee90", label: "BASIC" },
+               { name: "Good", chance: 5, color: "#90ee90", label: "BASIC" },
+               { name: "Natural", chance: 8, color: "#4ade80", label: "BASIC" },
+               { name: "Rare", chance: 16, color: "#3b82f6", label: "BASIC" },
+               { name: "Divinus", chance: 32, color: "#FFFF00", label: "BASIC" },
+               { name: "Crystallized", chance: 64, color: "#C71585", label: "BASIC" },
+               { name: "Rage", chance: 128, color: "#8B0000", label: "BASIC" },
+               { name: "Topaz", chance: 150, color: "#FF8C00", label: "BASIC" },
+               { name: "Ruby", chance: 350, color: "#ef4444", label: "BASIC" },
+               { name: "Forbidden", chance: 403, color: "#fcd34d", label: "BASIC" },
+               { name: "Emerald", chance: 500, color: "#eab308", label: "BASIC" },
+               { name: "Gilded", chance: 512, color: "#FFD700", label: "BASIC" },
+               { name: "Ink", chance: 700, color: "#000000", label: "BASIC", glow: "#ffffff" },
+               { name: "Jackpot", chance: 777, color: "#FFA500", label: "BASIC" },
+               { name: "Sapphire", chance: 800, color: "#0000FF", label: "BASIC" },
+               { name: "Aquamarine", chance: 900, color: "#7FFFD4", label: "BASIC" },
+               { name: "wind", chance: 900, color: "#E0FFFF", label: "BASIC" },
+               { name: "Diaboli", chance: 1004, color: "#800000", label: "EPIC" },
+               { name: "Precious", chance: 1024, color: "#00BFFF", label: "EPIC" },
+               { name: "Hydrogen", chance: 1111, color: "#ffffff", label: "EPIC" },
+               { name: "Atomic", chance: 1180, color: "#9400D3", label: "EPIC" },
+               { name: "Glock", chance: 1700, color: "#C0C0C0", label: "EPIC" },
+               { name: "Magnetic", chance: 2048, color: "#ff0000", label: "EPIC" },
+               { name: "Ash", chance: 2300, color: "#696969", label: "EPIC" },
+               { name: "Glacier", chance: 2304, color: "#B0E0E6", label: "EPIC" },
+               { name: "Player", chance: 3000, color: "#008000", label: "EPIC" },
+               { name: "Flora", chance: 3700, color: "#32CD32", label: "EPIC" },
+               { name: "Cola", chance: 3999, color: "#8B4513", label: "EPIC" },
+               { name: "Sidereum", chance: 4096, color: "#9400D3", label: "EPIC" },
+               { name: "Bleeding", chance: 4444, color: "#800000", label: "EPIC" },
+               { name: "Flutter", chance: 5000, color: "#ffffff", label: "EPIC" },
+               { name: ":Flushed:", chance:6900, color: "#ADFF2F", label: "EPIC" },
+               { name: "Hazard", chance: 7000, color: "#8B008B", label: "EPIC" },
+               { name: "Doodle", chance:7500, color: "#ffffff", label: "EPIC" },
+               { name: "Quartz", chance: 8192, color: "#FF00FF", label: "EPIC" },
+               { name: "Honey", chance: 8335, color: "#FF8C00", label: "EPIC" },
+               { name: "Lost Soul", chance: 9200, color: "#40E0D0", label: "EPIC" },
+               { name: "Atomic: Ribonucleic", chance: 9876, color: "#4B0082", label: "EPIC" },
+               { name: "Undead", chance: 12000, color: "#006400", label: "UNIQUE" },
+               { name: "Corrosive", chance: 12000, color: "#4B0082", label: "UNIQUE" },
+               { name: "Rage: Heated", chance: 12800, color: "#FF0000", label: "UNIQUE" },
+               { name: "Ink: Leak", chance: 14000, color: "#000000", label: "UNIQUE", glow: "#ffffff" },
+               { name: "Powered", chance: 16384, color: "#ffffff", label: "UNIQUE" },
+               { name: "Copper", chance: 29000, color: "#D2691E", label: "UNIQUE" },
+               { name: "Watt", chance: 32768, color: "#000000", label: "UNIQUE", glow: "#000e5dff"},
+               { name: "Aquatic", chance: 40000, color: "#00BFFF", label: "UNIQUE" },
+               { name: "Solar", chance: 50000, color: "#FFA500", label: "UNIQUE" },
+               { name: "Lunar", chance: 50000, color: "#3700DB", label: "UNIQUE" },
+               { name: "Starlight", chance: 50000, color: "#ffffff", label: "UNIQUE", glow: "#3030eaff" },
+               { name: "Star Rider", chance: 50000, color: "#FFD700", label: "UNIQUE" },
+               { name: "Pleiades", chance: 65358, color: "#68dcffff", label: "UNIQUE" },
+               { name: ":Flushed: Lobotomy", chance: 69000, color: "#00FF00", label: "UNIQUE" },
+               { name: "Hazard: Rays", chance: 70000, color: "#8A2BE2", label: "UNIQUE" },
+               { name: "Nautilus", chance: 70000, color: "#0000CD", label: "UNIQUE" },
+               { name: "Permafrost", chance: 73500, color: "#AFEEEE", label: "UNIQUE" },
+               { name: "Pulsar", chance: 83345, color: "#0009b4ff", label: "UNIQUE" },
+               { name: "Constella", chance: 86988, color: "#b400b4ff", label: "UNIQUE" },
+               { name: "✿ Flow ✿", chance: 87000, color: "#87CEFA", label: "UNIQUE" },
+               { name: "Stormal", chance: 90000, color: "#D3D3D3", label: "UNIQUE" },
+               { name: "Exotic", chance: 99000, color: "#000000", label: "LEGENDARY", glow: "#87CEEB" },
+               { name: "Diaboli: Void", chance: 100400, color: "#000000", label: "LEGENDARY", glow: "#00008B" },
+               { name: "Divinus: Angel", chance: 120000, color: "#FFDEAD", label: "LEGENDARY", glow: "#FFDEAD" },
+               { name: "Comet", chance: 120000, color: "#ffffff", label: "LEGENDARY", glow: "#000000" },
+               { name: "Jade", chance: 125000, color: "#3CB371", label: "LEGENDARY", glow: "#000000" },
+               { name: "Spectre", chance: 140000, color: "#000000", label: "LEGENDARY", glow: "#AFEEEE" },
+               { name: "Jazz", chance: 160000, color: "#FFD700", label: "LEGENDARY", glow: "#FFD700" },
+               { name: "Aether", chance: 180000, color: "#000000", label: "LEGENDARY", glow: "#00FA9A" },
+               { name: "Bounded", chance: 200000, color: "#1E90FF", label: "LEGENDARY", glow: "#000000" },
+               { name: "lantern", chance: 333333, color: "#98FB98", label: "LEGENDARY", glow: "#98FB98" },
+               { name: "Celestial", chance: 350000, color: "#E0FFFF", label: "LEGENDARY", glow: "#000000" },
+               { name: "Vortex", chance: 399999, color: "#3300ffff", label: "LEGENDARY", glow: "#8f01f5ff" },
+               { name: "Terror", chance: 400000, color: "#ba00dbff", label: "LEGENDARY", glow: "#FF1493" },
+               { name: "Hope", chance: 488725, color: "#F4A460", label: "LEGENDARY", glow: "#000000" },
+               { name: "Warlock", chance: 666000, color: "#FF1493", label: "LEGENDARY", glow: "#000000" },
+               { name: "Undead: Devil", chance: 666666, color: "#FF0000", label: "LEGENDARY", glow: "#FF0000" },
+               { name: "Kyawthuite", chance: 850000, color: "#9370DB", label: "LEGENDARY", glow: "#9370DB" },
+               { name: "Symbiosis", chance: 1000000, color: "#4B0082", label: "MYTHIC", glow: "#4B0082" },
+               { name: "Starlight: Kunzite", chance: 1000000, color: "#FF00FF", label: "MYTHIC", glow: "#FF00FF" },
+               { name: "Arcane", chance: 1000000, color: "#1E90FF", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Magnetic: Reverse Polarity", chance: 1000000, color: "#FF69B4", label: "MYTHIC", glow: "#FF69B4" },
+               { name: "Undefined", chance: 1111000, color: "#696969", label: "MYTHIC", glow: "#808080" },
+               { name: "Rage: Brawler", chance: 1280000, color: "#FF0000", label: "MYTHIC", glow: "#000000" },
+               { name: "Astral", chance: 1336000, color: "#4B0082", label: "MYTHIC", glow: "#000000" },
+               { name: "Amethyst", chance: 1337000, color: "#8A2BE2", label: "MYTHIC", glow: "#4B0082" },
+               { name: "Cosmos", chance: 1520000, color: "#000000", label: "MYTHIC", glow: "#8A2BE2" },
+               { name: "Archmage", chance: 1766000, color: "#00008B", label: "MYTHIC", glow: "#FFD700" },
+               { name: "Player: Respawn", chance: 1999999, color: "#00FA9A", label: "MYTHIC", glow: "#00FA9A" },
+               { name: "Bounded: Unbound", chance: 2000000, color: "#BA55D3", label: "MYTHIC", glow: "#BA55D3" },
+               { name: "Gravitational", chance: 2000000, color: "#9400D3", label: "MYTHIC", glow: "#000000" },
+               { name: "Flowed", chance: 2121121, color: "#DCDCDC", label: "MYTHIC", glow: "#000000" },
+               { name: "Evanescent", chance: 2360000, color: "#0000CD", label: "MYTHIC", glow: "#000000" },
+               { name: "Virtual", chance: 2500000, color: "#1E90FF", label: "MYTHIC", glow: "#000000" },
+               { name: "Vega", chance: 2580000, color: "#1e56ffff", label: "MYTHIC", glow: "#0422cfff" },
+               { name: "Parasite", chance: 3000000, color: "#4B0082", label: "MYTHIC", glow: "#000000" },
+               { name: "Orion", chance: 3000000, color: "#ff7207ff", label: "MYTHIC", glow: "#00056cff" },
+               { name: "Apatite", chance: 3133133, color: "#00FFFF", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Savior", chance: 3200000, color: "#000000", label: "MYTHIC", glow: "#FF00FF" },
+               { name: "Shift Lock", chance: 3325000, color: "#D3D3D3", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Cosmos: Alice", chance: 3500000, color: "#000000", label: "MYTHIC", glow: "#ADD8E6" },
+               { name: "Crystallized: Bejeweled", chance: 3600000, color: "#EE82EE", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Metabytes", chance: 4000000, color: "#4169E1", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Poseidon", chance: 4000000, color: "#5F9EA0", label: "MYTHIC" },
+               { name: "Zeus", chance: 4500000, color: "#FFFF00", label: "MYTHIC" },
+               { name: "Lunar: Full Moon", chance: 5000000, color: "#FFFACD", label: "MYTHIC" },
+               { name: "Galaxy", chance: 5000000, color: "#8A2BE2", label: "MYTHIC", glow: "#000000" },
+               { name: "Solar: solstice", chance: 5000000, color: "#FFFF00", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Twilight", chance: 6000000, color: "#9370DB", label: "MYTHIC", glow: "#9370DB" },
+               { name: "Astronaut", chance: 6117196, color: "#ff6a00ff", label: "MYTHIC", glow: "#240078ff" },
+               { name: "Origin", chance: 6500000, color: "#191970", label: "MYTHIC", glow: "#0000CD" },
+               { name: "Hades", chance: 6666666, color: "#FF4500", label: "MYTHIC", glow: "#FF0000" },
+               { name: "Celestial: divine", chance: 7000000, color: "#E6E6FA", label: "MYTHIC", glow: "#DDA0DD" },
+               { name: "Anubis", chance: 7200000, color: "#000000", label: "MYTHIC", glow: "#D2691E" },
+               { name: "Refraction", chance: 7242000, color: "#9400D3", label: "MYTHIC", glow: "#9400D3" },
+               { name: "+Faith+", chance: 7250000, color: "#FFD700", label: "MYTHIC", glow: "#000000" },
+               { name: "Hyper-Volt", chance: 7500000, color: "#9370DB", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Velocity", chance: 7630000, color: "#FFA500", label: "MYTHIC", glow: "#FFA500" },
+               { name: "Nautilus: lost", chance: 7700000, color: "#4682B4", label: "MYTHIC", glow: "#4682B4" },
+               { name: "Divinus: Guardian", chance: 7700000, color: "#DAA520", label: "MYTHIC", glow: "#DAA520" },
+               { name: "Outlaw", chance: 8000000, color: "#F4A460", label: "MYTHIC", glow: "#F4A460" },
+               { name: "Harnessed", chance: 8500000, color: "#0000FF", label: "MYTHIC", glow: "#1E90FF" },
+               { name: "[ Nihility ]", chance: 9000000, color: "#000000", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Helios", chance: 9000000, color: "#FFD700", label: "MYTHIC", glow: "#FFD700" },
+               { name: "Stargazer", chance: 9200000, color: "#FF1493", label: "MYTHIC", glow: "#000000" },
+               { name: "Starscourge", chance: 10000000, color: "#FF0000", label: "EXALTED", glow: "#FF0000" },
+               { name: "Guardian", chance: 10000000, color: "#0000CD", label: "EXALTED", glow: "#0000CD" },
+               { name: "Sharkyn", chance: 10000000, color: "#87CEFA", label: "EXALTED", glow: "#87CEFA" },
+               { name: "Melodic", chance: 11300000, color: "#FFD700", label: "EXALTED", glow: "#FFD700" },
+               { name: "Sailor", chance: 12000000, color: "#1E90FF", label: "EXALTED", glow: "#1E90FF" },
+               { name: "Hurricane", chance: 13500000, color: "#DCDCDC", label: "EXALTED", glow: "#000000" },
+               { name: "Sirius", chance: 14000000, color: "#FFDAB9", label: "EXALTED", glow: "#FFDAB9" },
+               { name: "Arcane: Legacy", chance: 15000000, color: "#1E90FF", label: "EXALTED", glow: "#1E90FF" },
+               { name: "Icarus", chance: 15660000, color: "#EBB866", label: "EXALTED", glow: "#EBB866" },
+               { name: "Lullaby", chance: 17000000, color: "#191970", label: "EXALTED", glow: "#1E90FF" },
+               { name: "Chromatic", chance: 20000000, color: "#373A3A", label: "EXALTED", glow: "#00FA9A" },
+               { name: "Aviator", chance: 24000000, color: "#FFFF00", label: "EXALTED", glow: "#FFD700" },
+               { name: "Apotheosis", chance: 24691356, color: "#9370DB", label: "EXALTED", glow: "#9370DB" },
+               { name: "Centurion", chance: 25000000, color: "#4c15b9ff", label: "EXALTED", glow: "#9480bbff" },
+               { name: "Blizzard", chance: 27315000, color: "#B0E0E6", label: "EXALTED", glow: "#B0E0E6" },
+               { name: "Arcane: Dark", chance: 30000000, color: "#000000", label: "EXALTED", glow: "#1E90FF" },
+               { name: "Flora: Forest", chance: 32800000, color: "#FFDAB9", label: "EXALTED", glow: "#FF1493" },
+               { name: "Ethereal", chance: 35000000, color: "#E6E6FA", label: "EXALTED", glow: "#E6E6FA" },
+               { name: "Virtual: Fatal Error", chance: 40413000, color: "#4B0082", label: "EXALTED", glow: "#FF0000" },
+               { name: "Overseer", chance: 45000000, color: "#F0FFFF", label: "EXALTED", glow: "#000000" },
+               { name: "Exotic: Apex", chance:49999500, color: "#7FFFD4", label: "EXALTED", glow: "#000000" },
+               { name: "Runic", chance: 50000000, color: "#00FF7F", label: "EXALTED", glow: "#32CD32" },
+               { name: "Matrix", chance: 50000000, color: "#00FA9A", label: "EXALTED", glow: "#00FA9A" },
+               { name: "Twilight: Iridescent Memory", chance: 60000000, color: "#F5F5F5", label: "EXALTED", glow: "#F5F5F5" },
+               { name: "ANTIVIRUS", chance: 62500000, color: "#1E90FF", label: "EXALTED", glow: "#00BFFF" },
+               { name: "Sentinel", chance: 60000000, color: "#00008B", label: "EXALTED", glow: "#00BFFF" },
+               { name: "Dominion", chance: 70000000, color: "#FFD700", label: "EXALTED", glow: "#CFB53B" },
+               { name: "Carriage", chance: 80000000, color: "#EBB866", label: "EXALTED", glow: "#FFD700" },
+               { name: "Virtual: Full Control", chance: 80000000, color: "#00FA9A", label: "EXALTED", glow: "#00FA9A" },
+               { name: "Sailor: Flying Dutchman", chance: 80000000, color: "#00a846ff", label: "EXALTED", glow: "#00d382ff" },
+               { name: "Aquaria", chance: 80000000, color: "#d400ffff", label: "EXALTED", glow: "#01fbffff" },
+               { name: "Harnessed: Elements", chance: 85000000, color: "#FCC01E", label: "EXALTED", glow: "#FCC01E" },
+               { name: "Virtual: Worldwide", chance: 87500000, color: "#F5F5F5", label: "EXALTED", glow: "#F5F5F5" },
+               { name: "Atomic: Nucleus", chance: 92118000, color: "#1E90FF", label: "EXALTED", glow: "#7B68EE" },
+               { name: "Chromatic: Genesis", chance: 99999999, color: "#000000", label: "GLORIUS", glow: "#F0F8FF" },
+               { name: "Spectraflow", chance: 100000000, color: "#7B68EE", label: "GLORIUS", glow: "#7B68EE" },
+               { name: "Starscourge: Radiant", chance: 100000000, color: "#F0F8FF", label: "GLORIUS", glow: "#ffffff" },
+               { name: "Sharkyn: Hammerhead", chance: 120000000, color: "#0083f5ff", label: "GLORIUS", glow: "#0090feff" },
+               { name: "Overture", chance: 150000000, color: "#0000CD", label: "GLORIUS", glow: "#000000" },
+               { name: "Symphony", chance: 175000000, color: "#F0FFFF", label: "GLORIUS", glow: "#ffffff" },
+               { name: "Felled", chance: 180000000, color: "#8B0000", label: "GLORIUS", glow: "#FF0000" },
+               { name: "Twilight: Withering Grace", chance: 180000000, color: "#D3D3D3", label: "GLORIUS", glow: "#A9A9A9" },
+               { name: "Impeached", chance: 200000000, color: "#690e80ff", label: "GLORIUS", glow: "#BA55D3" },
+               { name: "Lumenpool", chance: 220000000, color: "#00FF7F", label: "GLORIUS", glow: "#3CB371" },
+               { name: "Hyper-Volt: Ever-Storm", chance: 225000000, color: "#8A2BE2", label: "GLORIUS", glow: "#8A2BE2" },
+               { name: "Astral: Zodiac", chance: 267200000, color: "#FF1493", label: "GLORIUS", glow: "#FF69B4" },
+               { name: "Prophecy", chance: 275649430, color: "#FFD700", label: "GLORIUS", glow: "#FFD700" },
+               { name: "Exotic: Void", chance: 299999999, color: "#BA55D3", label: "GLORIUS", glow: "#FF00FF" },
+               { name: "Bloodlust", chance: 300000000, color: "#800000", label: "GLORIUS", glow: "#FF0000" },
+               { name: "Overture: History", chance: 300000000, color: "#008000", label: "GLORIUS", glow: "#00FF7F" },
+               { name: "Maelstrom", chance: 309999999, color: "#00FA9A", label: "GLORIUS", glow: "#3CB371" },
+               { name: "Perpetual", chance: 315000000, color: "#3CB371", label: "GLORIUS", glow: "#3CB371" },
+               { name: "Lotusfall", chance: 320000000, color: "#00008B", label: "GLORIUS", glow: "#87CEFA" },
+               { name: "Jazz: Orchestra", chance: 336870912, color: "#FFD700", label: "GLORIUS", glow: "#F4A460" },
+               { name: "Archangel", chance: 250000000, color: "#F5DEB3", label: "GLORIUS", glow: "#F4A460" },
+               { name: "Atlas", chance: 360000000, color: "#FFDEAD", label: "GLORIUS", glow: "#F4A460" },
+               { name: "Flora: Evergreen", chance: 370073730, color: "#32CD32", label: "GLORIUS", glow: "#228B22" },
+               { name: "Chillsear", chance: 375000000, color: "#48D1CC", label: "GLORIUS", glow: "#B0E0E6" },
+               { name: "Abyssal Hunter", chance: 400000000, color: "#000086ff", label: "GLORIUS", glow: "#0000CD" },
+               { name: "Gargantua", chance: 430000000, color: "#191970", label: "GLORIUS", glow: "#FF8C00" },
+               { name: "Apostolos", chance: 444000000, color: "#ff0000ff", label: "GLORIUS", glow: "#0055ffff" },
+               { name: "Kyawthuite: Remembrance", chance: 450000000, color: "#BA55D3", label: "GLORIUS", glow: "#7B68EE" },
+               { name: "Ruins", chance: 500000000, color: "#00FA9A", label: "GLORIUS", glow: "#2E8B57" },
+               { name: "Matrix: Overdrive", chance: 503000000, color: "#800000", label: "GLORIUS", glow: "#FF0000" },
+               { name: "Sailor: Admiral", chance: 540000000, color: "#7f7f7fff", label: "EXALTED", glow: "#b7b7b7ff" },
+               { name: "Sophyra", chance: 570000000, color: "#7B68EE", label: "GLORIUS", glow: "#0000CD" },
+               { name: "Matrix: Reality", chance: 601020102, color: "#b638baff", label: "GLORIUS", glow: "#f36fffff" },
+               { name: "Pythios", chance: 666666666, color: "#8B0000", label: "GLORIUS", glow: "#DC143C" },
+               { name: "Sovereign", chance: 750000000, color: "#ffff73ff", label: "GLORIUS", glow: "#4f77fcff" },
+               { name: "Ruins: Withered", chance: 800000000, color: "#00FA9A", label: "GLORIUS", glow: "#228B22" },
+               { name: "eisveil", chance: 830000000, color: "#ffffffff", label: "GLORIUS", glow: "#b9fff0ff" },
+               { name: "Poseidon: Atlantis", chance: 850000000, color: "#00d0ffff", label: "GLORIUS", glow: "#46ddffff" },
+               { name: "Ascendant", chance: 935000000, color: "#B59410", label: "TRANSCENDENT", glow: "#FFD700" },
+               { name: "Pixelation", chance:1073741824, color: "#00FA9A", label: "TRANSCENDENT", glow: "#e1ff00ff" },
+               { name: "Luminosity", chance:1200000000, color: "#d8edffff", label: "TRANSCENDENT", glow: "#a7fcfbff" },
+               { name: "Breakthrough", chance: 1999999999, color: "#696969", label: "TRANSCENDENT", glow: "#C0C0C0" },
+               { name: "Equinox", chance: 2500000000, color: "#000000", label: "TRANSCENDENT", glow: "#ffffff" },
+               { name: "Monarch", chance: 3000000000, color: "#8A2BE2", label: "CHALLENGED", glow: "#4B0082" },
+              ];
+
+              // Breakthrough Database
+              const breakthroughData = {
+              //Rainy
+              "Evanescent": {"Rainy": 840000},
+              "Poseidon": {"Rainy": 1000000},
+              "Sharkyn": {"Rainy": 2500000},
+              "Sailor": {"Rainy": 3000000},
+              "Sailor: Flying Dutchman": {"Rainy": 20000000},
+              "Aquaria": {"Rainy": 20000000},
+              "Sharkyn: Hammerhead": {"Rainy": 30000000},
+              "Lumenpool": {"Rainy": 55000000},
+              "Abyssal Hunter": {"Rainy": 100000000},
+              "Sailor: Admiral": {"Rainy": 135000000},
+              "Poseidon: Atlantis": {"Rainy":  212500000},
+              //Windy
+              "wind": {"Windy": 300},
+              "✿ Flow ✿": {"Windy": 29000},
+              "Stormal": {"Windy": 30000},
+              "Vortex": {"Windy": 133333},
+              "Hurricane": {"Windy": 4500000},
+              "Aviator": {"Windy": 8000000},
+              "Maelstrom": {"Windy": 103333333},
+              //Snowy
+              "Glacier": {"Snowy": 768},
+              "Permafrost": {"Snowy": 24500},
+              "Blizzard": {"Snowy": 9105000},
+              "Chillsear": {"Snowy": 125000000},
+              "eisveil": {"Snowy": 276666666},
+              //Sand Storm
+
+              };
+
+              function getAuraChance(aura) {
+              return breakthroughData[aura.name]
+              ?.[currentBiome.name] ?? aura.chance;
+              }
+
+              // Crafting Recipes
+              const craftingRecipes = [
+                  { id: "luck_glove", name: "Luck Glove", bonus: 0.25, ingredients: [{ name: "Rare", amount: 3 }, { name: "Divinus", amount: 2 }, { name: "Crystallized", amount: 1 }] },
+                  { id: "solar_device", name: "Solar Device", bonus: 0.5, ingredients: [{ name: "Rare", amount: 10 }, { name: "Divinus", amount: 5 }, { name: "Solar", amount: 1 }] },
+                  { id: "eclipse_device", name: "Eclipse Device", bonus: 0.75, ingredients: [{ name: "Rare", amount: 20 }, { name: "Divinus", amount: 10 }, { name: "Lunar", amount: 1 }, { name: "Solar", amount: 1 }] },
+                  { id: "exo_gauntlet", name: "Exo Gauntlet", bonus: 1, ingredients: [{ name: "Gilded", amount: 3 }, { name: "Precious", amount: 2 }, { name: "Magnetic", amount: 2 }, { name: "Sidereum", amount: 1 }, { name: "Undead", amount: 1 }, { name: "Exotic", amount: 1 }] },
+                  { id: "windstorm_device", name: "Windstorm Device", bonus: 1.25, ingredients: [{ name: "wind", amount: 25 }, { name: "Precious", amount: 12 }, { name: "Sidereum", amount: 4 }, { name: "Aquatic", amount: 1 }, { name: "Stormal", amount: 1 }] },
+                  { id: "subzero_device", name: "Subzero Device", bonus: 1.5, ingredients: [{ name: "Crystallized", amount: 300 }, { name: "Glacier", amount: 30 }, { name: "Precious", amount: 20 }, { name: "Magnetic", amount: 10 }, { name: "Sidereum", amount: 5 }, { name: "Aquatic", amount: 2 }, { name: "Permafrost", amount: 2 }] },
+                  { id: "galactic_device", name: "Galactic Device", bonus: 2.5, ingredients: [{ name: "Sapphire", amount: 100 }, { name: "Diaboli", amount: 40 }, { name: "Magnetic", amount: 31 }, { name: "Solar", amount: 10 }, { name: "Lunar", amount: 10 }, { name: "Comet", amount: 3 }, { name: "Galaxy", amount: 1 }] },
+                  { id: "volcanic_device", name: "Volcanic Device", bonus: 2.9, ingredients: [{ name: "Rage", amount: 500 }, { name: "Diaboli", amount: 70 }, { name: "Bleeding", amount: 25 }, { name: "Rage: Heated", amount: 5 }, { name: "Hades", amount: 1 }] },
+                  { id: "exoflex_device", name: "Exoflex Device", bonus: 3.4, ingredients: [{ name: "Rare", amount: 15000 }, { name: "Forbidden", amount: 1000 }, { name: "Aquamarine", amount: 500 }, { name: "Starlight", amount: 40 }, { name: "Sidereum", amount: 250 }, { name: "Undead", amount: 20 }, { name: "Exotic", amount: 25 }, { name: "Jade", amount: 5 }, { name: "Arcane", amount: 3 }] },
+                  { id: "genesis_drive", name: "Genesis Drive", bonus: 12, ingredients: [{ name: "Powered", amount: 2000 }, { name: "Watt", amount: 1200 }, { name: "Exotic", amount: 200 }, { name: "Aether", amount: 100 }, { name: "Bounded", amount: 100 }, { name: "Virtual", amount: 25 }, { name: "Origin", amount: 10 }, { name: "Hyper-Volt", amount: 5 }, { name: "Chromatic", amount: 2 }, { name: "Matrix", amount: 2 }, { name: "Chromatic: Genesis", amount: 1 }] },
+                  { id: "heavenly_device", name: "Heavenly Device", bonus: 15, ingredients: [{ name: "Divinus: Angel", amount: 500 }, { name: "Hope", amount: 150 }, { name: "+Faith+", amount: 15 }, { name: "Icarus", amount: 10 }, { name: "Prophecy", amount: 1 }, { name: "Archangel", amount: 1 }] },
+                  { id: "singularity_gauntlet", name: "Singularity Gauntlet", bonus: 22, ingredients: [{ name: "Centurion", amount: 5 }, { name: "Astronaut", amount: 10 }, { name: "Vega", amount: 20 }, { name: "Starscourge: Radiant", amount: 2 }, { name: "Starscourge", amount: 10 }, { name: "Constella", amount: 1000 }, { name: "Pulsar", amount: 1000 }, { name: "Pleiades", amount: 1000 }, { name: "Galaxy", amount: 50 }, { name: "Orion", amount: 100 }, { name: "Starlight", amount: 6000 }, { name: "Powered", amount: 12900 }, { name: "Solar", amount: 10000 }, { name: "Lunar", amount: 10000 }] },
+              ];
+
+              // Potions
+              const potions = [
+                  { id: "lucky",name: "Lucky Potion",percentLuck: 0.25,duration: 300,cooldown: 300 },
+                  { id: "fortune_I",name: "Fortune Potion I",percentLuck: 0.50,duration: 300,cooldown: 350 },
+                  { id: "fortune_II",name: "Fortune Potion II",percentLuck: 0.75,duration: 300,cooldown: 450 },
+                  { id: "fortune_III",name: "Fortune Potion III",percentLuck: 1,duration: 300,cooldown: 550 },
+                  { id: "bound", name: "Potion of Bound", luck: 50000, cooldown: 300,requiredRolls: 10000 },
+                  { id: "heavenly", name: "Heavenly Potion", luck: 150000, cooldown: 600,requiredRolls: 25000 },
+                  { id: "godlike", name: "Godlike Potion", luck: 400000, cooldown: 900,requiredRolls: 50000 },
+                  { id: "oblivion", name: "Oblivion Potion", luck: 600000, cooldown: 1200,requiredRolls: 7500},
+              ];
+
+              // Game State
+              let stats = {
+                  totalRolls: 0,
+                  baseLuck: 1.0,
+                  inventory: {},
+                  crafted: {},
+                  equipped: [],
+                  cooldowns: {},
+                  activePotion: null,
+                  timedPotion: null,
+                  rollBonusCounter: 0,
+                  bonusRoll: false,
+                  settings: {
+                      bgVolume: 1,
+                      cutsceneEnabled: true,
+                      cutsceneThreshold: 1
+                  },
+              };
+
+              let autoRollInterval = null;
+              let autoRollPaused = false;
+
+              function init() {
+                 const saved = localStorage.getItem('solsRngSave_pro_v3');
+
+                 if (saved) {
+                     try {
+                         const parsed = JSON.parse(saved);
+                         const validChecksum = btoa(JSON.stringify(parsed.stats));
+
+                         document.getElementById('cutscene-threshold').value = stats.settings.cutsceneThreshold;
+
+                         if (validChecksum === parsed.checksum) {
+                             stats = { ...stats, ...parsed.stats };
+                         }
+                     } catch (e) {
+                         console.log("Save corrupted.");
+                     }
+                 }
+
+                 stats.activePotion = null;
+
+                 updateUI();
+                 startBackgroundMusic();
+                 setInterval(updateCooldownUI, 100);
+                 setInterval(save, 10000);
+                 setInterval(updateBiomeSystem, 1000);
+              }
+
+              function deleteAura(name) {
+                  const item = stats.inventory[name];
+                  if (!item) return;
+
+                  if (item.chance >= 1000000) {
+                      const ok = confirm(
+                          `⚠️ Are you sure you want to delete "${name}"?\n\nThis aura has a rarity of 1 in ${item.chance.toLocaleString()}.`
+                      );
+                      if (!ok) return;
+                  }
+
+                  if (item.count > 1) {
+                      item.count--;
+                  } else {
+                      delete stats.inventory[name];
+                  }
+
+                  showNotification(`${name} deleted.`, "#ef4444");
+                  renderInventory();
+                  save();
+              }
+
+              function playAuraCutscene(aura, callback) {
+                  if (aura.name === "Pixelation") {const played = playVideoCutscene("https://files.catbox.moe/nowsgv.webm",aura.chance,callback); if (played)playCutsceneAudio("https://files.catbox.moe/uqlsif.mp3");return played;}
+                  if (aura.name === "Luminosity") {return playVideoCutscene("https://files.catbox.moe/j8vm64.webm",aura.chance,callback);}
+                  if (aura.name === "< Leviathan >") {const played = playVideoCutscene("https://files.catbox.moe/6ikt9v.webm",aura.chance,callback); if (played)playCutsceneAudio("https://files.catbox.moe/pp1u1w.mp3");return played;}
+                  if (aura.name === "Breakthrough") {const played = playVideoCutscene("https://files.catbox.moe/hra9x0.webm",aura.chance,callback); if (played)playCutsceneAudio("https://files.catbox.moe/lovjna.mp3");return played;}
+                  if (aura.name === "Equinox") {return playVideoCutscene("https://files.catbox.moe/9yco8e.webm",aura.chance,callback);}
+                  if (aura.name === "Monarch") {return playVideoCutscene("https://files.catbox.moe/735wlk.webm",aura.chance,callback);}
+                  if (aura.name === "[ Illusionary ]") {return playVideoCutscene("https://files.catbox.moe/kc7ioa.webm",aura.chance,callback);}
+                  if (aura.name === "[ Oppression ]") {return playVideoCutscene("https://files.catbox.moe/vnd52x.webm",aura.chance,callback);}
+                  if (aura.name === "Dreammetric") {return playVideoCutscene("https://files.catbox.moe/81lcqj.webm",aura.chance,callback);}
+                  if (aura.name === "Ascendant") {return playVideoCutscene("https://files.catbox.moe/qqlamz.webm",aura.chance,callback);}
+                  if (aura.name === "Ruins: Withered") {return playVideoCutscene("https://files.catbox.moe/cqqn18.webm",aura.chance,callback);}
+                  if (aura.name === "Sovereign") {return playVideoCutscene("https://files.catbox.moe/jiaakm.webm",aura.chance,callback);}
+                  if (aura.name === "Pythios") {return playVideoCutscene("https://files.catbox.moe/323wrf.webm",aura.chance,callback);}
+                  if (aura.name === "Matrix: Reality") {return playVideoCutscene("https://files.catbox.moe/wpeqr1.webm",aura.chance,callback);}
+                  if (aura.name === "Sophyra") {const played = playVideoCutscene("https://files.catbox.moe/0g3fl9.webm",aura.chance,callback); if (played)playCutsceneAudio("https://files.catbox.moe/41rqah.mp3");return played;}
+                  return false;
+              }
+
+              function save() {
+                 const data = { stats: stats, checksum: btoa(JSON.stringify(stats)) };
+                 localStorage.setItem('solsRngSave_pro_v3', JSON.stringify(data));
+              }
+
+              function updateCutsceneThreshold(value) {
+                 const num = parseInt(value);
+                 stats.settings.cutsceneThreshold = isNaN(num) || num < 1 ? 1 : num;
+                 save();
+              }
+
+              function stopAllMedia() {
+                 const bgMusic = document.getElementById('bg-music');
+                 bgMusic.pause();
+                 bgMusic.currentTime = 0;
+
+                 const video = document.getElementById('cutscene-video');
+                 video.pause();
+                 video.currentTime = 0;
+                 video.style.display = "none";
+
+                 const audio = document.getElementById('cutscene-audio');
+                 audio.pause();
+                 audio.currentTime = 0;
+              }
+
+              function playVideoCutscene(src, auraChance = Infinity, callback = null) {
+                 stopAllMedia();
+                 if (!stats.settings.cutsceneEnabled) return false;
+                 if (auraChance < stats.settings.cutsceneThreshold) return false;
+
+                 const video = document.getElementById('cutscene-video');
+                 const bgMusic = document.getElementById('bg-music');
+
+                 autoRollPaused = true;
+                 bgMusic.pause();
+                 video.pause();
+                 video.currentTime = 0;
+                 video.src = src;
+                 video.style.display = "block";
+
+                 const playPromise = video.play();
+                 if (playPromise !== undefined) {
+                     playPromise.catch(err => { console.log("Autoplay blocked:", err); });
+                 }
+
+                 video.onended = () => {
+                     video.style.display = "none";
+                     video.pause();
+                     video.currentTime = 0;
+                     bgMusic.play();
+                     setTimeout(() => {
+                         autoRollPaused = false;
+                         if (callback) callback();
+                     }, 300);
+                 };
+
+                 return true;
+              }
+
+              function playCutsceneAudio(src) {
+                 const audio = document.getElementById('cutscene-audio');
+                 audio.pause();
+                 audio.currentTime = 0;
+                 audio.src = src;
+                 audio.volume = 1;
+                 const playPromise = audio.play();
+                 if (playPromise !== undefined) {
+                     playPromise.catch(err => { console.log("Audio blocked:", err); });
+                 }
+              }
+
+              function startBackgroundMusic() {
+                 const bgMusic = document.getElementById('bg-music');
+                 bgMusic.volume = stats.settings.bgVolume;
+                 const playPromise = bgMusic.play();
+                 if (playPromise !== undefined) {
+                     playPromise.catch(() => {
+                         document.body.addEventListener('click', () => { bgMusic.play(); }, { once: true });
+                     });
+                 }
+              }
+
+              function updateBGVolume(value) {
+                 const volume = value / 100;
+                 stats.settings.bgVolume = volume;
+                 const bgMusic = document.getElementById('bg-music');
+                 bgMusic.volume = volume;
+                 save();
+              }
+
+              function toggleCutscene() {
+                 stats.settings.cutsceneEnabled = !stats.settings.cutsceneEnabled;
+                 const btn = document.getElementById('cutscene-toggle');
+                 if (stats.settings.cutsceneEnabled) {
+                     btn.innerText = "on";
+                     btn.className = "bg-green-500 px-6 py-1 font-black text-black min-w-[80px]";
+                 } else {
+                     btn.innerText = "off";
+                     btn.className = "bg-red-500 px-6 py-1 font-black text-black min-w-[80px]";
+                 }
+                 save();
+              }
+
+              function calculateTotalLuck() {
+                 let deviceBonus = 0;
+                 stats.equipped.forEach(id => {
+                     const recipe = craftingRecipes.find(r => r.id === id);
+                     if (recipe) deviceBonus += recipe.bonus;
+                 });
+
+                 let total = stats.baseLuck + deviceBonus;
+                 if (stats.bonusRoll) { total *= 2; }
+                 if (stats.activePotion) { total += stats.activePotion.luck; }
+                 if (stats.timedPotion) {
+                     if (Date.now() < stats.timedPotion.expiresAt) {
+                         total *= (1 + stats.timedPotion.percentLuck);
+                     } else {
+                         stats.timedPotion = null;
+                     }
+                 }
+                 return total;
+              }
+
+              function updateUI() {
+                  const totalLuck = calculateTotalLuck();
+                  const streak = document.getElementById("roll-streak");
+
+                  if (stats.bonusRoll) {
+                      streak.innerText = "2x Luck";
+                      streak.className = "text-lg font-black mb-3 text-green-750 tracking-widest animate-pulse";
+                  } else {
+                      streak.innerText = `${stats.rollBonusCounter + 1}/10`;
+                      streak.className = "text-lg font-black mb-3 text-green-750 tracking-widest";
+                  }
+                  document.getElementById('roll-count').innerText = stats.totalRolls.toLocaleString();
+                  document.getElementById('luck-multiplier').innerText = `${totalLuck.toLocaleString()}x Luck`;
+
+                  const deviceContainer = document.getElementById('active-devices');
+                  deviceContainer.innerHTML = '';
+                  stats.equipped.forEach(id => {
+                      const device = craftingRecipes.find(r => r.id === id);
+                      if (device) {
+                          const span = document.createElement('span');
+                          span.className = "text-[9px] bg-blue-500/20 border border-blue-500/40 px-2 py-1 rounded text-blue-300 font-black uppercase tracking-widest";
+                          span.innerText = device.name;
+                          deviceContainer.appendChild(span);
+                      }
+                  });
+
+                  const potionInd = document.getElementById('potion-indicator');
+                  if (stats.timedPotion && Date.now() < stats.timedPotion.expiresAt) {
+                      const remaining = Math.ceil((stats.timedPotion.expiresAt - Date.now()) / 1000);
+                      potionInd.classList.remove('hidden');
+                      potionInd.innerText = `🍀 LUCKY POTION ACTIVE (+15%) ${remaining}s`;
+                  } else if (stats.activePotion) {
+                      potionInd.classList.remove('hidden');
+                      potionInd.innerText = `✨ NEXT ROLL: +${stats.activePotion.luck.toLocaleString()} LUCK ✨`;
+                  } else {
+                      potionInd.classList.add('hidden');
+                  }
+              }
+
+              function spawnParticles(count, color, type = 'star') {
+                  const container = document.getElementById('particle-container');
+                  for (let i = 0; i < count; i++) {
+                      const p = document.createElement('div');
+                      p.className = 'particle';
+
+                      let size, distance, duration;
+                      if (type === 'ultimate') {
+                          size = Math.random() * 15 + 5;
+                          distance = Math.random() * 800 + 200;
+                          duration = 3;
+                      } else if (type === 'epic') {
+                          size = Math.random() * 8 + 4;
+                          distance = Math.random() * 400 + 100;
+                          duration = 2;
+                      } else {
+                          size = Math.random() * 5 + 2;
+                          distance = Math.random() * 200 + 50;
+                          duration = 1;
+                      }
+
+                      p.style.width = size + 'px';
+                      p.style.height = size + 'px';
+                      p.style.backgroundColor = color;
+                      p.style.left = '50%';
+                      p.style.top = '50%';
+                      p.style.boxShadow = `0 0 15px ${color}`;
+
+                      const angle = Math.random() * Math.PI * 2;
+                      const tx = Math.cos(angle) * distance;
+                      const ty = Math.sin(angle) * distance;
+
+                      p.style.setProperty('--tw-x', `${tx}px`);
+                      p.style.setProperty('--tw-y', `${ty}px`);
+                      p.style.animation = `particle-fade ${duration}s cubic-bezier(0, .5, .5, 1) forwards`;
+
+                      container.appendChild(p);
+                      setTimeout(() => p.remove(), duration * 1000);
+                  }
+              }
+
+              function roll() {
+                 if (autoRollPaused) return;
+
+                 stats.totalRolls++;
+                 const totalLuck = calculateTotalLuck();
+
+                 if (stats.bonusRoll) {
+                     stats.bonusRoll = false;
+                     stats.rollBonusCounter = 0;
+                 } else {
+                     stats.rollBonusCounter++;
+                     if (stats.rollBonusCounter >= 10) {
+                         stats.bonusRoll = true;
+                     }
+                 }
+                let rolledAura = auras[0];
+
+      const sorted = [...auras].sort(
+          (a, b) => getAuraChance(b) - getAuraChance(a)
+      );
+
+      for (const aura of sorted) {
+          const chance = getAuraChance(aura);
+          const effectiveChance = chance / totalLuck;
+
+          if (Math.random() < (1 / effectiveChance)) {
+              rolledAura = aura;
+              break;
+          }
+      }
+
+                 stats.activePotion = null;
+
+                 const hasCutscene = playAuraCutscene(rolledAura, () => {
+                     displayAura(rolledAura, getAuraChance(rolledAura))
+                     addToInventory(rolledAura);
+                 });
+
+                 if (!hasCutscene) {
+                     displayAura(rolledAura, getAuraChance(rolledAura))
+                     addToInventory(rolledAura);
+                 }
+
+                 if (stats.totalRolls % 1000 === 0) {
+                     stats.baseLuck += 0.01;
+                     showNotification("BASE LUCK UPGRADED! +0.01", "#4ade80");
+                 }
+
+                 updateUI();
+                 save();
+              }
+
+              function displayAura(aura, displayChance = aura.chance) {
+                  const nameEl = document.getElementById('aura-name');
+                  const labelEl = document.getElementById('rarity-label');
+                  const chanceEl = document.getElementById('aura-chance');
+                  const bgEl = document.getElementById('background-aura');
+                  const container = document.getElementById('aura-container');
+
+                  nameEl.innerText = aura.name;
+                  nameEl.style.color = aura.color;
+                  nameEl.style.textShadow = `0 0 50px ${aura.glow || aura.color}`;
+
+                  labelEl.innerText = aura.label;
+                  chanceEl.innerText = `1 IN ${displayChance.toLocaleString()}`;
+
+                  bgEl.style.background = `radial-gradient(circle, ${aura.color}55 0%, transparent 80%)`;
+
+                  if (aura.chance >= 99000000) {
+                      spawnParticles(100, aura.color, 'epic');
+                      container.classList.add('shake');
+                      setTimeout(() => container.classList.remove('shake'), 900);
+                  } else if (aura.chance >= 1000000) {
+                      spawnParticles(75, aura.color, 'epic');
+                      container.classList.add('shake');
+                      setTimeout(() => container.classList.remove('shake'), 600);
+                  } else if (aura.chance >= 100000) {
+                      spawnParticles(50, aura.color, 'epic');
+                      container.classList.add('shake');
+                      setTimeout(() => container.classList.remove('shake'), 300);
+                  } else if (aura.chance >= 1000) {
+                      spawnParticles(25, aura.color);
+                  }
+
+                  if (aura.chance >= 99000000) {
+                      showNotification(`GLOBAL: ${aura.name}!`, aura.color);
+                  } else if (aura.chance >= 10000000) {
+                      showNotification(`ULTRA RARE: ${aura.name}!`, aura.color);
+                  } else if (aura.chance >= 100000) {
+                      showNotification(`RARE: ${aura.name}!`, aura.color);
+                  }
+              }
+
+              function addToInventory(aura) {
+                 const auraName = aura.name;
+                 if (!stats.inventory[auraName]) {
+                     stats.inventory[auraName] = {
+                         count: 0,
+                         color: aura.color,
+                         chance: aura.chance,
+                         label: aura.label
+                     };
+                 }
+                 stats.inventory[auraName].count++;
+              }
+
+              function toggleEquip(id) {
+                  const index = stats.equipped.indexOf(id);
+                  if (index > -1) {
+                      stats.equipped.splice(index, 1);
+                      showNotification("DEVICE UNEQUIPPED", "#FF0000");
+                  } else {
+                      stats.equipped.push(id);
+                      showNotification("DEVICE EQUIPPED", "#00FF00");
+                  }
+                  updateUI();
+                  renderCrafting();
+                  save();
+              }
+
+              function craftDevice(id) {
+                  const recipe = craftingRecipes.find(r => r.id === id);
+
+                  for (const ing of recipe.ingredients) {
+                      const owned = stats.inventory[ing.name]?.count || 0;
+                      if (owned < ing.amount) {
+                          showNotification(`INSUFFICIENT MATERIALS: ${ing.name}`, "#ef4444");
+                          return;
+                      }
+                  }
+
+                  recipe.ingredients.forEach(ing => {
+                      stats.inventory[ing.name].count -= ing.amount;
+                  });
+
+                  stats.crafted[id] = (stats.crafted[id] || 0) + 1;
+
+                  if (!stats.equipped.includes(id)) {
+                      stats.equipped.push(id);
+                  }
+
+                  showNotification(`SUCCESSFULLY CRAFTED ${recipe.name}!`, "#3b82f6");
+
+                  updateUI();
+                  renderCrafting();
+                  save();
+              }
+
+              function usePotion(id) {
+                 const pot = potions.find(p => p.id === id);
+                 const now = Date.now();
+
+                 if (pot.requiredRolls && stats.totalRolls < pot.requiredRolls) {
+                     showNotification(`LOCKED: ${pot.requiredRolls.toLocaleString()} ROLLS REQUIRED`, "#ef4444");
+                     return;
+                 }
+
+                 if (pot.percentLuck) {
+                    stats.timedPotion = {
+                        percentLuck: pot.percentLuck,
+                        expiresAt: Date.now() + (pot.duration * 1000)
+                    };
+                    stats.cooldowns[id] = Date.now() + (pot.cooldown * 1000);
+                    showNotification(`USED ${pot.name.toUpperCase()}!`, "#22c55e");
+                    updateUI();
+                    renderPotions();
+                    save();
+                    return;
+                 }
+
+                 if (stats.cooldowns[id] && now < stats.cooldowns[id]) {
+                     return;
+                 }
+
+                 stats.activePotion = pot;
+                 stats.cooldowns[id] = now + (pot.cooldown * 1000);
+
+                 showNotification(`${pot.name.toUpperCase()} ACTIVATED!`, "#a855f7");
+
+                 updateUI();
+                 renderPotions();
+                 save();
+              }
+
+              function updateCooldownUI() {
+                  const now = Date.now();
+                  potions.forEach(pot => {
+                      const btn = document.getElementById(`btn-pot-${pot.id}`);
+                      const overlay = document.getElementById(`overlay-pot-${pot.id}`);
+                      if (!btn || !overlay) return;
+
+                      const cdEnd = stats.cooldowns[pot.id] || 0;
+                      if (now < cdEnd) {
+                          const remaining = Math.ceil((cdEnd - now) / 1000);
+                          btn.disabled = true;
+                          btn.innerText = `${remaining}s`;
+                          overlay.style.height = `${((cdEnd - now) / (pot.cooldown * 1000)) * 100}%`;
+                      } else {
+                          btn.disabled = false;
+                          btn.innerText = "CONSUME";
+                          overlay.style.height = `0%`;
+                      }
+                  });
+              }
+
+              function renderCrafting() {
+                  const list = document.getElementById('crafting-list');
+                  list.innerHTML = '';
+
+                  craftingRecipes.forEach(recipe => {
+                      const count = stats.crafted[recipe.id] || 0;
+                      const isEquipped = stats.equipped.includes(recipe.id);
+                      const div = document.createElement('div');
+                      div.className = `bg-white/5 border border-white/10 rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 ${isEquipped ? 'btn-equipped' : ''}`;
+
+                      let ingredientsHtml = recipe.ingredients.map(ing => {
+                          const owned = stats.inventory[ing.name]?.count || 0;
+                          const isEnough = owned >= ing.amount;
+                          return `<span class="${isEnough ? 'text-green-400' : 'text-red-400'} text-[9px] bg-black/40 px-2 py-1 rounded font-bold uppercase">
+                              ${ing.name}: ${owned}/${ing.amount}
+                          </span>`;
+                      }).join(' ');
+
+                      let equipBtnHtml = count > 0 ? `
+                          <button onclick="toggleEquip('${recipe.id}')" class="w-32 ${isEquipped ? 'bg-red-600/50 hover:bg-red-600' : 'bg-green-600/50 hover:bg-green-600'} py-2 rounded-lg font-black text-xs transition-all uppercase">
+                              ${isEquipped ? 'Unequip' : 'Equip'}
+                          </button>
+                      ` : '';
+
+                      div.innerHTML = `
+                          <div class="flex-grow">
+                              <div class="flex items-center gap-3">
+                                  <h3 class="text-xl font-black text-blue-400 italic tracking-tighter uppercase">${recipe.name} (+${recipe.bonus}x)</h3>
+                                  ${count > 0 ? `<span class="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-0.5 rounded font-black">OWNED x${count}</span>` : ''}
+                              </div>
+                              <div class="flex flex-wrap gap-2 mt-2">${ingredientsHtml}</div>
+                          </div>
+                          <div class="flex gap-2">
+                              ${equipBtnHtml}
+                              <button onclick="craftDevice('${recipe.id}')" class="w-32 bg-blue-600 hover:bg-blue-500 py-2 rounded-lg font-black text-xs transition-all uppercase">
+                                  Craft
+                              </button>
+                          </div>
+                      `;
+                      list.appendChild(div);
+                  });
+              }
+
+              function renderPotions() {
+                  const list = document.getElementById('potions-list');
+                  list.innerHTML = '';
+
+                  potions.forEach(pot => {
+                      const isLocked =(pot.requires &&(!stats.inventory[pot.requires] ||stats.inventory[pot.requires].count <= 0))
+                      ||(pot.requiredRolls &&stats.totalRolls < pot.requiredRolls);
+                      const div = document.createElement('div');
+                      div.className = `bg-white/5 border border-white/10 rounded-xl p-4 relative overflow-hidden flex flex-col justify-between h-36 ${isLocked ? 'opacity-40 grayscale' : ''}`;
+
+                      div.innerHTML = `
+                          <div class="cooldown-overlay" id="overlay-pot-${pot.id}"></div>
+                          <div class="relative z-10">
+                              <h3 class="font-black text-purple-400 text-sm italic tracking-widest uppercase">${pot.name}</h3>
+                              <p class="text-[10px] font-bold text-gray-400 mt-1">
+                                ${pot.percentLuck ? `+${pot.percentLuck * 100}\% LUCK FOR${pot.duration}s` : `+${pot.luck.toLocaleString()} LUCK FOR NEXT ROLL`}
+                              </p>
+                              ${pot.requiredRolls ? `<p class="text-[8px] text-yellow-400 mt-2 uppercase font-black">UNLOCK: ${pot.requiredRolls.toLocaleString()} ROLLS</p>` : ''}
+                          </div>
+                          <button id="btn-pot-${pot.id}" onclick="usePotion('${pot.id}')" class="relative z-10 w-full bg-purple-600 hover:bg-purple-500 py-2 rounded font-black text-[10px] text-white uppercase mt-4 transition-all">
+                              Consume
+                          </button>
+                      `;
+                      list.appendChild(div);
+                  });
+              }
+
+              function renderInventory() {
+                  const list = document.getElementById('inventory-list');
+                  list.innerHTML = '';
+                  const keys = Object.keys(stats.inventory).filter(k => stats.inventory[k].count > 0).sort((a, b) => stats.inventory[b].chance - stats.inventory[a].chance);
+
+                  if (keys.length === 0) {
+                      list.innerHTML = '<div class="col-span-full text-center text-gray-500 italic py-20 uppercase tracking-widest text-sm font-black">No Collections Yet...</div>';
+                      return;
+                  }
+
+                  keys.forEach(name => {
+                      const item = stats.inventory[name];
+                      const div = document.createElement('div');
+                      div.className = 'bg-white/5 p-4 rounded-xl border border-white/5 flex flex-col justify-between hover:bg-white/10 transition-all';
+                      div.innerHTML = `
+                          <div>
+                              <div class="text-[8px] opacity-70 font-black tracking-[0.2em] uppercase">${item.label}</div>
+                              <div class="text-xs font-black truncate uppercase mt-1" style="color:${item.color}">
+                                  ${name}
+                              </div>
+                          </div>
+
+                          <div class="flex justify-between items-center mt-4">
+                              <span class="text-[8px] text-gray-500 font-bold italic">
+                                  1/${item.chance.toLocaleString()}
+                              </span>
+                              <span class="text-[10px] font-black bg-white/10 px-2 py-0.5 rounded">
+                                  x${item.count}
+                              </span>
+                          </div>
+
+                          <button
+                              onclick="deleteAura('${name.replace(/'/g, "\\'")}')"
+                              class="mt-3 w-full bg-red-600 hover:bg-red-500 py-1 rounded text-[10px] font-black uppercase transition">
+                              Delete
+                          </button>
+                      `;
+                      list.appendChild(div);
+                  });
+              }
+
+              function openModal(id) {
+                  document.getElementById(id).classList.remove('hidden');
+                  if (id === 'inventory-modal') renderInventory();
+                  if (id === 'crafting-modal') renderCrafting();
+                  if (id === 'potions-modal') renderPotions();
+              }
+
+              function closeModal(id) {
+                  document.getElementById(id).classList.add('hidden');
+              }
+
+              function toggleAutoRoll() {
+                  stats.autoRoll = document.getElementById('auto-roll').checked;
+                  const dot = document.getElementById('auto-toggle-dot');
+                  const bg = document.getElementById('auto-toggle-bg');
+
+                  if (stats.autoRoll) {
+                      dot.classList.add('translate-x-7');
+                      bg.classList.add('bg-blue-600');
+                      clearInterval(autoRollInterval);
+                      autoRollInterval = setInterval(roll, 444);
+                  } else {
+                      dot.classList.remove('translate-x-7');
+                      bg.classList.remove('bg-blue-600');
+                      clearInterval(autoRollInterval);
+                  }
+              }
+
+              function showNotification(text, color) {
+                  const container = document.getElementById('notif-container');
+                  const n = document.createElement('div');
+                  n.className = 'px-5 py-3 bg-black/90 border-r-4 rounded shadow-2xl transform translate-x-full transition-all duration-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-3';
+                  n.style.borderRightColor = color;
+                  n.innerHTML = `<div class="w-2 h-2 rounded-full" style="background-color: ${color}"></div>${text}`;
+                  container.appendChild(n);
+                  setTimeout(() => n.classList.remove('translate-x-full'), 10);
+                  setTimeout(() => {
+                      n.classList.add('opacity-0');
+                      setTimeout(() => n.remove(), 500);
+                  }, 3000);
+              }
+
+              init();
+    </script>
+  </body>
+</html>
