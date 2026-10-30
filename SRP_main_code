@@ -7,9 +7,9 @@
     <title>Sol's RNG</title>
 
     <link
-      rel="icon"
-      type="image/png"
-      href="https://files.catbox.moe/ttfu7s.webp"
+    rel="icon"
+    href="https://files.catbox.moe/ttfu7s.webp"
+    type="image/webp"
     />
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -234,6 +234,12 @@
             class="text-sm font-black uppercase tracking-wider mt-1 text-gray-400 transition-colors"
           >
             [ Normal ]
+          </p>
+          <p
+          id="day-night-display"
+          class="text-sm font-black uppercase tracking-wider mt-1 text-yellow-300"
+          >
+          DAY [ 02:30 ]
           </p>
           <div
             id="active-devices"
@@ -513,7 +519,7 @@
                 { name: "Windy", chance: 500, duration: 120, color: "#a7f3d0" },
                 { name: "Glitched", chance: 5100000, duration: 164, color: "#cfcfcfff" },
                 { name: "Dreamspace", chance: 3500000, duration: 192, color: "#ff00e1ff" },
-                { name: "Singularity", chance: 750000, duration: 1200, color: "#ff7300ff" },
+                { name: "Singularity", chance: 75000, duration: 1200, color: "#ff7300ff" },
               ];
 
               let currentBiome = {
@@ -521,6 +527,56 @@
                 color: "#9ca3af",
                 expiresAt: 0
               };
+
+// DAY & NIGHT SYSTEM
+const DAY_NIGHT_DURATION = 150; // 150 detik per fase
+
+let currentDayNight = {
+    name: "Day",
+    startedAt: Date.now()
+};
+
+function updateDayNightSystem() {
+    const display = document.getElementById("day-night-display");
+    if (!display) return;
+
+    const now = Date.now();
+
+    // Menghitung waktu yang telah berlalu sejak sistem dimulai
+    const elapsed = Math.floor(
+        (now - currentDayNight.startedAt) / 1000
+    );
+
+    // Menghitung fase berdasarkan siklus 300 detik
+    const cycleTime = elapsed % (DAY_NIGHT_DURATION * 2);
+
+    if (cycleTime < DAY_NIGHT_DURATION) {
+        currentDayNight.name = "Day";
+
+        const remaining = DAY_NIGHT_DURATION - cycleTime;
+
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+
+        display.innerText =
+            `DAY [ ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} ]`;
+
+        display.style.color = "#facc15";
+    } else {
+        currentDayNight.name = "Night";
+
+        const remaining =
+            (DAY_NIGHT_DURATION * 2) - cycleTime;
+
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+
+        display.innerText =
+            `NIGHT [ ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")} ]`;
+
+        display.style.color = "#0d0070ff";
+    }
+}
 
               function updateBiomeSystem() {
                 const biomeEl = document.getElementById('biome-display');
@@ -538,7 +594,7 @@
                       currentBiome = {
                         name: b.name,
                         color: b.color,
-                        expiresAt: now + (b.duration * 1000)
+                        expiresAt: now + (b.duration * 3000)
                       };
 
             const specialBiomeMessages = {
@@ -618,6 +674,7 @@
                { name: "Cola", chance: 3999, color: "#8B4513", label: "EPIC" },
                { name: "Sidereum", chance: 4096, color: "#9400D3", label: "EPIC" },
                { name: "Bleeding", chance: 4444, color: "#800000", label: "EPIC" },
+               { name: "Hellfire", chance: 4776, color: "#b90303ff", label: "EPIC" },
                { name: "Flutter", chance: 5000, color: "#ffffff", label: "EPIC" },
                { name: ":Flushed:", chance:6900, color: "#ADFF2F", label: "EPIC" },
                { name: "Hazard", chance: 7000, color: "#8B008B", label: "EPIC" },
@@ -631,6 +688,7 @@
                { name: "Rage: Heated", chance: 12800, color: "#FF0000", label: "UNIQUE" },
                { name: "Ink: Leak", chance: 14000, color: "#000000", label: "UNIQUE", glow: "#ffffff" },
                { name: "Powered", chance: 16384, color: "#ffffff", label: "UNIQUE" },
+               { name: "Gilded: Crowned", chance: 20000, color: "#ffbb00ff", label: "UNIQUE" },
                { name: "Copper", chance: 29000, color: "#D2691E", label: "UNIQUE" },
                { name: "Watt", chance: 32768, color: "#000000", label: "UNIQUE", glow: "#000e5dff"},
                { name: "Aquatic", chance: 40000, color: "#00BFFF", label: "UNIQUE" },
@@ -693,7 +751,7 @@
                { name: "Zeus", chance: 4500000, color: "#FFFF00", label: "MYTHIC" },
                { name: "Lunar: Full Moon", chance: 5000000, color: "#FFFACD", label: "MYTHIC" },
                { name: "Galaxy", chance: 5000000, color: "#8A2BE2", label: "MYTHIC", glow: "#000000" },
-               { name: "Solar: solstice", chance: 5000000, color: "#FFFF00", label: "MYTHIC", glow: "#ffffff" },
+               { name: "Solar: Solstice", chance: 5000000, color: "#FFFF00", label: "MYTHIC", glow: "#ffffff" },
                { name: "Twilight", chance: 6000000, color: "#9370DB", label: "MYTHIC", glow: "#9370DB" },
                { name: "Astronaut", chance: 6117196, color: "#ff6a00ff", label: "MYTHIC", glow: "#240078ff" },
                { name: "Origin", chance: 6500000, color: "#191970", label: "MYTHIC", glow: "#0000CD" },
@@ -738,11 +796,13 @@
                { name: "ANTIVIRUS", chance: 62500000, color: "#1E90FF", label: "EXALTED", glow: "#00BFFF" },
                { name: "Sentinel", chance: 60000000, color: "#00008B", label: "EXALTED", glow: "#00BFFF" },
                { name: "Dominion", chance: 70000000, color: "#FFD700", label: "EXALTED", glow: "#CFB53B" },
+               { name: "Melodic: Serenade", chance: 77000000, color: "#190072ff", label: "EXALTED", glow: "#3102dcff" },
                { name: "Carriage", chance: 80000000, color: "#EBB866", label: "EXALTED", glow: "#FFD700" },
                { name: "Virtual: Full Control", chance: 80000000, color: "#00FA9A", label: "EXALTED", glow: "#00FA9A" },
                { name: "Sailor: Flying Dutchman", chance: 80000000, color: "#00a846ff", label: "EXALTED", glow: "#00d382ff" },
                { name: "Aquaria", chance: 80000000, color: "#d400ffff", label: "EXALTED", glow: "#01fbffff" },
                { name: "Harnessed: Elements", chance: 85000000, color: "#FCC01E", label: "EXALTED", glow: "#FCC01E" },
+               { name: "Hellbound", chance: 85000000, color: "#d10202ff", label: "EXALTED", glow: "#fc1e1eff" },
                { name: "Virtual: Worldwide", chance: 87500000, color: "#F5F5F5", label: "EXALTED", glow: "#F5F5F5" },
                { name: "Atomic: Nucleus", chance: 92118000, color: "#1E90FF", label: "EXALTED", glow: "#7B68EE" },
                { name: "Chromatic: Genesis", chance: 99999999, color: "#000000", label: "GLORIUS", glow: "#F0F8FF" },
@@ -752,6 +812,7 @@
                { name: "Overture", chance: 150000000, color: "#0000CD", label: "GLORIUS", glow: "#000000" },
                { name: "Symphony", chance: 175000000, color: "#F0FFFF", label: "GLORIUS", glow: "#ffffff" },
                { name: "Felled", chance: 180000000, color: "#8B0000", label: "GLORIUS", glow: "#FF0000" },
+               { name: "Projection", chance: 197000000, color: "#ffee00ff", label: "CHALLENGED", glow: "#000000ff" },
                { name: "Twilight: Withering Grace", chance: 180000000, color: "#D3D3D3", label: "GLORIUS", glow: "#A9A9A9" },
                { name: "Impeached", chance: 200000000, color: "#690e80ff", label: "GLORIUS", glow: "#BA55D3" },
                { name: "Lumenpool", chance: 220000000, color: "#00FF7F", label: "GLORIUS", glow: "#3CB371" },
@@ -765,7 +826,7 @@
                { name: "Perpetual", chance: 315000000, color: "#3CB371", label: "GLORIUS", glow: "#3CB371" },
                { name: "Lotusfall", chance: 320000000, color: "#00008B", label: "GLORIUS", glow: "#87CEFA" },
                { name: "Jazz: Orchestra", chance: 336870912, color: "#FFD700", label: "GLORIUS", glow: "#F4A460" },
-               { name: "Archangel", chance: 250000000, color: "#F5DEB3", label: "GLORIUS", glow: "#F4A460" },
+               { name: "Archangel", chance: 350000000, color: "#F5DEB3", label: "GLORIUS", glow: "#F4A460" },
                { name: "Atlas", chance: 360000000, color: "#FFDEAD", label: "GLORIUS", glow: "#F4A460" },
                { name: "Flora: Evergreen", chance: 370073730, color: "#32CD32", label: "GLORIUS", glow: "#228B22" },
                { name: "Chillsear", chance: 375000000, color: "#48D1CC", label: "GLORIUS", glow: "#B0E0E6" },
@@ -773,9 +834,11 @@
                { name: "Gargantua", chance: 430000000, color: "#191970", label: "GLORIUS", glow: "#FF8C00" },
                { name: "Apostolos", chance: 444000000, color: "#ff0000ff", label: "GLORIUS", glow: "#0055ffff" },
                { name: "Kyawthuite: Remembrance", chance: 450000000, color: "#BA55D3", label: "GLORIUS", glow: "#7B68EE" },
+               { name: "Volcanic", chance: 480000000, color: "#db0000ff", label: "GLORIUS", glow: "#ff0000ff" },
                { name: "Ruins", chance: 500000000, color: "#00FA9A", label: "GLORIUS", glow: "#2E8B57" },
                { name: "Matrix: Overdrive", chance: 503000000, color: "#800000", label: "GLORIUS", glow: "#FF0000" },
-               { name: "Sailor: Admiral", chance: 540000000, color: "#7f7f7fff", label: "EXALTED", glow: "#b7b7b7ff" },
+               { name: "Sailor: Admiral", chance: 540000000, color: "#7f7f7fff", label: "GLORIUS", glow: "#b7b7b7ff" },
+               { name: "Point: Zero", chance: 521121900, color: "#59008dff", label: "CHALLENGED", glow: "#7d00c5ff" },
                { name: "Sophyra", chance: 570000000, color: "#7B68EE", label: "GLORIUS", glow: "#0000CD" },
                { name: "Matrix: Reality", chance: 601020102, color: "#b638baff", label: "GLORIUS", glow: "#f36fffff" },
                { name: "Pythios", chance: 666666666, color: "#8B0000", label: "GLORIUS", glow: "#DC143C" },
@@ -786,13 +849,27 @@
                { name: "Ascendant", chance: 935000000, color: "#B59410", label: "TRANSCENDENT", glow: "#FFD700" },
                { name: "Pixelation", chance:1073741824, color: "#00FA9A", label: "TRANSCENDENT", glow: "#e1ff00ff" },
                { name: "Luminosity", chance:1200000000, color: "#d8edffff", label: "TRANSCENDENT", glow: "#a7fcfbff" },
+               { name: "Astraios", chance:1750000000, color: "#00ac17ff", label: "CHALLENGED+", glow: "#11d32bff" },
                { name: "Breakthrough", chance: 1999999999, color: "#696969", label: "TRANSCENDENT", glow: "#C0C0C0" },
+               { name: "Dream Catcher", chance: 2222222222, color: "#e2a4ffff", label: "CHALLENGED", glow: "#c46cffff" },
                { name: "Equinox", chance: 2500000000, color: "#000000", label: "TRANSCENDENT", glow: "#ffffff" },
-               { name: "Monarch", chance: 3000000000, color: "#8A2BE2", label: "CHALLENGED", glow: "#4B0082" },
+               { name: "Monarch", chance: 3000000000, color: "#8A2BE2", label: "CHALLENGED+", glow: "#4B0082" },
               ];
 
               // Breakthrough Database
               const breakthroughData = {
+              //Day
+              "Solar": {"Day": 5000},
+              "Solar: Solstice": {"Day": 500000},
+              //Night
+              "Lunar": {"Night": 5000},
+              "Lunar: Full Moon": {"Night": 500000},
+              "Twilight": {"Night": 600000},
+              "Lullaby": {"Night": 1700000},
+              "Twilight:Iridescent Memory": {"Night": 6000000},
+              "Melodic: Serenade": {"Night": 7700000},
+              "Twilight: Withering Grace": {"Night": 18000000},
+              "Dreamer": {"Night": 31500000},
               //Rainy
               "Evanescent": {"Rainy": 840000},
               "Poseidon": {"Rainy": 1000000},
@@ -820,13 +897,55 @@
               "Chillsear": {"Snowy": 125000000},
               "eisveil": {"Snowy": 276666666},
               //Sand Storm
-
+              "Gilded": {"Sandstorm": 128},
+              "Jackpot": {"Sandstorm": 194},
+              "Gilded: Crowned": {"Sandstorm": 5000},
+              "Anubis": {"Sandstorm": 1800000},
+              "Outlaw": {"Sandstorm": 2000000},
+              "Atlas": {"Sandstorm": 90000000},
+              //Hell
+              "Hellfire": {"Hell": 796},
+              "Undead": {"Hell": 2000},
+              "Undead: Devil": {"Hell": 111111},
+              "Hades": {"Hell": 1111111},
+              "Hellbound": {"Hell": 14166666},
+              "Felled": {"Hell": 30000000},
+              "Bloodlust": {"Hell": 50000000},
+              "Volcanic": {"Hell": 80000000},
+              "Pythios": {"Hell": 111111111},
+              //Starfall
               };
 
               function getAuraChance(aura) {
-              return breakthroughData[aura.name]
-              ?.[currentBiome.name] ?? aura.chance;
+              const bt = breakthroughData[aura.name];
+              return (
+              bt?.[currentBiome.name] ??
+              bt?.[currentDayNight.name] ??
+              aura.chance
+              );
               }
+              
+              // Biome Exclusive Aura Database
+              const biomeExclusiveAuras = {
+                  "Monarch": "Corruption",
+                  "Dream Catcher": "Night",
+                  "Empty": "Null",
+                  "Astronaut": "Singularity",
+                  "Pleiades": "Singularity",
+                  "Pulsar": "Singularity",
+                  "Constella": "Singularity",
+                  "Vega": "Singularity",
+                  "Astronaut": "Singularity",
+                  "Centurion": "Singularity",
+                  "Projection": "Singularity",
+                  "Point: Zero": "Singularity",
+                  "Astraios": "Singularity",
+              };
+
+              // Aura yang tidak bisa didapatkan di biome tertentu
+              const biomeRestrictedAuras = {
+                  "Breakthrough": "Null",
+              };
 
               // Crafting Recipes
               const craftingRecipes = [
@@ -853,7 +972,7 @@
                   { id: "bound", name: "Potion of Bound", luck: 50000, cooldown: 300,requiredRolls: 10000 },
                   { id: "heavenly", name: "Heavenly Potion", luck: 150000, cooldown: 600,requiredRolls: 25000 },
                   { id: "godlike", name: "Godlike Potion", luck: 400000, cooldown: 900,requiredRolls: 50000 },
-                  { id: "oblivion", name: "Oblivion Potion", luck: 600000, cooldown: 1200,requiredRolls: 7500},
+                  { id: "oblivion", name: "Oblivion Potion", luck: 600000, cooldown: 1200,requiredRolls: 75000},
               ];
 
               // Game State
@@ -903,6 +1022,7 @@
                  setInterval(updateCooldownUI, 100);
                  setInterval(save, 10000);
                  setInterval(updateBiomeSystem, 1000);
+                 setInterval(updateDayNightSystem, 250);
               }
 
               function deleteAura(name) {
@@ -911,7 +1031,7 @@
 
                   if (item.chance >= 1000000) {
                       const ok = confirm(
-                          `⚠️ Are you sure you want to delete "${name}"?\n\nThis aura has a rarity of 1 in ${item.chance.toLocaleString()}.`
+                          `Are you sure you want to delete "${name}"?\n\nThis aura has a rarity of 1 in ${item.chance.toLocaleString()}.`
                       );
                       if (!ok) return;
                   }
@@ -1171,15 +1291,39 @@
           (a, b) => getAuraChance(b) - getAuraChance(a)
       );
 
-      for (const aura of sorted) {
-          const chance = getAuraChance(aura);
-          const effectiveChance = chance / totalLuck;
 
-          if (Math.random() < (1 / effectiveChance)) {
-              rolledAura = aura;
-              break;
-          }
-      }
+for (const aura of sorted) {
+    // Aura eksklusif untuk biome atau Day/Night tertentu
+    const requiredCondition = biomeExclusiveAuras[aura.name];
+
+    if (requiredCondition) {
+        if (
+            requiredCondition !== currentBiome.name &&
+            requiredCondition !== currentDayNight.name
+        ) {
+            continue;
+        }
+    }
+
+    // Aura yang dilarang di biome tertentu
+    const restrictedBiome = biomeRestrictedAuras[aura.name];
+
+    if (
+        restrictedBiome &&
+        currentBiome.name === restrictedBiome
+    ) {
+        continue;
+    }
+
+    const chance = getAuraChance(aura);
+    const effectiveChance = chance / totalLuck;
+
+    if (Math.random() < (1 / effectiveChance)) {
+        rolledAura = aura;
+        break;
+    }
+}
+
 
                  stats.activePotion = null;
 
@@ -1313,7 +1457,6 @@
                         expiresAt: Date.now() + (pot.duration * 1000)
                     };
                     stats.cooldowns[id] = Date.now() + (pot.cooldown * 1000);
-                    showNotification(`USED ${pot.name.toUpperCase()}!`, "#22c55e");
                     updateUI();
                     renderPotions();
                     save();
@@ -1326,8 +1469,6 @@
 
                  stats.activePotion = pot;
                  stats.cooldowns[id] = now + (pot.cooldown * 1000);
-
-                 showNotification(`${pot.name.toUpperCase()} ACTIVATED!`, "#a855f7");
 
                  updateUI();
                  renderPotions();
